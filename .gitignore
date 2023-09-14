@@ -1,2 +1,6 @@
 data/
 *.csv
+HW1/npys
+*.npy
+*.png
+HW1/plots
