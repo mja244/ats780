@@ -173,7 +173,13 @@ plot_perm_importance(permute, sorted_idx, feature_list)
 
 #------------------Apply to testing data----------------------
 predictions_test = rf.predict(test_features)
+###
+base_anom = baseline_2020 - test_labels
+print(base_anom)
 
+pred_anom = predictions_test - test_labels
+print(pred_anom)
+###
 test_labels = replace_func(test_labels)
 predictions_test = replace_func(predictions_test)
 
@@ -192,3 +198,8 @@ baseline_2020_ = baseline_2020[baseline_2020 != 0]
 baseline_2020_ = replace_func(baseline_2020_)
 cm_baseline = confusion_matrix(test_labels_, baseline_2020_)
 heatmap(cm_baseline, 'baseline')
+
+## where did cook pvi get wrong and model got right?
+#
+#print(baseline_2020)
+#print(test_labels)
