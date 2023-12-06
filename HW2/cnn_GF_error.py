@@ -9,6 +9,9 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import sklearn
 import matplotlib.pyplot as plt
+import pickle
+from scipy.signal import detrend
+from settings import settings
 
 # Load data (previously processed on German supercomputer Levante)
 # 'response' is the precipitation response predicted from the GF (calculated on Levante)
@@ -26,16 +29,27 @@ predictand = response - output
 predictor = np.nan_to_num(predictor)
 predictand = np.nan_to_num(predictand)
 
+# detrend data
+predictor = detrend(predictor, axis=1)
+predictand = detrend(predictand, axis=1)
+
+# Combine ensemble members and years
+predictor = predictor.reshape(25000, 96, 192)
+predictand = predictand.reshape(25000)
+
+
 # Split data into training, validation, and testing
-# split along ensemble members (60 for training, 20 for validation, 20 for testing)
+# split along ensemble members (40 for training, 15 for validation, 15 for testing)
 
-Xtrain = predictor[0:60,:,:,:]
-Xval = predictor[60:80,:,:,:]
-Xtest = predictor[80:,:,:,:]
+Xtrain = predictor[0:3750,:,:,np.newaxis] # 0-15k, 0-10k
+Xval = predictor[3750:5000,:,:,np.newaxis] # 15k-20k, 
+Xtest = predictor[5000:6250,:,:,np.newaxis] # 20k-25k
 
-Ytrain = predictand[0:60,:]
-Yval = predictand[60:80,:]
-Ytest = predictand[80:,:]
+Ytrain = predictand[0:3750]
+Yval = predictand[3750:5000]
+Ytest = predictand[5000:6250]
+#Ytrain = np.full(100,1)
+#Yval = np.full(50,1)
 
 print('Shapes:')
 print('  Xtrain: ', Xtrain.shape)
@@ -44,9 +58,33 @@ print('  Xtest: ', Xtest.shape)
 
 print('  Ytrain: ', Ytrain.shape)
 print('  Yval: ', Yval.shape)
-print('  Ytest: ', Ytest.shape)
+#print('  Ytest: ', Ytest.shape)
 
-print(Xtrain[0,100,45,:])
+Xmean = np.nanmean(predictor, axis=0)
+Xstd = np.std(predictor, axis=0)
+Ymean = np.nanmean(predictand)
+Ystd = np.std(predictand)
+
+Xmean = Xmean[np.newaxis,:,:,np.newaxis]
+Xstd = Xstd[np.newaxis,:,:,np.newaxis]
+
+Xtrain = np.nan_to_num((Xtrain - Xmean) / Xstd)
+Xval = np.nan_to_num((Xval - Xmean) / Xstd)
+Xtest = np.nan_to_num((Xtest - Xmean) / Xstd)
+
+Ytrain = np.nan_to_num((Ytrain - Ymean) / Ystd)
+Yval = np.nan_to_num((Yval - Ymean) / Ystd)
+#Ytest = np.nan_to_num((Ytest - Ymean) / Ystd)
+
+np.save('data/Xtrain', Xtrain)
+np.save('data/Xval', Xval)
+np.save('data/Xtest', Xtest)
+np.save('data/Ytrain', Ytrain)
+np.save('data/Yval', Yval)
+#np.save('data/Ytest', Ytest)
+
+
+
 
 
 #----------------Build the model---------------------------------
@@ -55,31 +93,33 @@ def build_model(Xtrain, Ytrain, settings):
 	# create input layer
 	input_layer = tf.keras.layers.Input(shape=Xtrain.shape[1:])
 
-	# create normalization layer
-	normalizer = tf.keras.layers.Normalization(axis=(1,))
-	normalizer.adapt(Xtrain)
-	layers = normalizer(input_layer)
+	## create normalization layer
+	#normalizer = tf.keras.layers.Normalization(axis=(1,))
+	#normalizer.adapt(Xtrain)
+	#layers = normalizer(input_layer)
 
-	## what does this do?
-	#layers = Layer()(input_layer)
+	# use this if you don't normalize
+	layers = tf.keras.layers.Layer()(input_layer)
 
 	# convolutional layers (repeat 3 times: conv, conv, pooling)
 	for k_size, activation in zip(settings['kernels'], settings['kernel_act']):
 		layers = tf.keras.layers.Conv2D(
-			filters=32, 
+			filters=1, 
 			kernel_size=k_size, 
-			strides=1,
+			strides=2,
 			activation=activation, 
 			padding='same',
+			#input_shape=[96, 192, 1],
 		)(layers)
 
-		layers = tf.keras.layers.Conv2D(
-			filters=32, 
-			kernel_size=k_size, 
-			strides=1,
-			activation=activation, 
-			padding='same',
-		)(layers)
+		#layers = tf.keras.layers.Conv2D(
+		#	filters=1, 
+		#	kernel_size=k_size, 
+		#	strides=1,
+		#	activation=activation, 
+		#	padding='same',
+		#	input_shape=[96, 192, 1],
+		#)(layers)
 
 		# pooling layer (not necessary?)
 		layers = tf.keras.layers.MaxPool2D(pool_size=2, padding='same')(layers)
@@ -126,29 +166,77 @@ def compile_model(model, settings):
 
 #---------------------------Settings------------------------------
 
-settings = {
-	'network_type': 'cnn',
-	'kernel_size': 5,
-	'kernels': [32, 32, 32],
-	'kernel_act': ['relu', 'relu', 'relu'],
-	'hiddens': [16, 8],
-	'act_fun': ['relu', 'relu'],
-	'learning_rate': 0.000005,
-	'batch_size': 32,
-	'rng_seed': None,
-	'rng_seed_list': [123, ],
-	'n_epochs': 1,#25_000,
-	'patience': 10,
-	'loss': 'mse',
-	'random_seed': 33,
-}	
-
 tf.keras.backend.clear_session()
 tf.keras.utils.set_random_seed(settings['random_seed'])
 
 model = build_model(Xtrain, Ytrain, settings)
 model = compile_model(model, settings)
 
+model.save('small_cnn_model.keras')
+
+model = tf.keras.models.load_model('small_cnn_model.keras')
+
 
 #----------------------Train the model!----------------------------
 
+history = model.fit(
+	Xtrain,
+	Ytrain,
+	epochs=settings['n_epochs'],
+	batch_size=settings['batch_size'],
+	shuffle=True,
+	validation_data=[Xval, Yval],	
+	verbose=1,
+	)
+
+#with open('training_history_small.pkl', 'wb') as file:
+#	pickle.dump(history.history, file)
+
+##-----------plot loss---------------------------------
+#fig, axs = plt.subplots()
+#
+#axs.plot(history.history["loss"], label="training")
+#axs.plot(history.history["val_loss"], label="validation")
+#axs.set_xlabel("Epoch")
+#axs.set_ylabel("Loss")
+#axs.legend()
+#
+#plt.show()
+
+
+#------------plot predictions--------------------------
+errTrain = model.predict(Xtrain)
+errVal = model.predict(Xval)
+#errTest = model.predict(Xtest)
+#
+#np.save('data/errTrain', errTrain)
+#np.save('data/errVal', errVal)
+#np.save('data/errTest', errTest)
+#
+#errTrain = np.load('data/errTrain.npy')
+#errVal = np.load('data/errVal.npy')
+
+fig, ax = plt.subplots()
+
+ax.plot(np.arange(0, 150), errVal[0:150])
+ax.plot(np.arange(0, 150), Yval[0:150])
+
+ax.set_xlabel('Year')
+ax.set_ylabel('SUWS precip (mm/day normalized)')
+
+plt.show()
+plt.close()
+
+
+#-------------plot truth vs what model predicts------------
+errTest = model.predict(Xtest)
+
+fig, ax = plt.subplots()
+
+ax.scatter(errTest, Ytest)
+
+ax.set_xlabel('CNN prediction')
+ax.set_ylabel('AOGCM (actual)')
+
+plt.show()
+plt.close()

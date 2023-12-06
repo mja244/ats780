@@ -1,0 +1,17 @@
+settings = {
+        'network_type': 'cnn',
+        'kernel_size': 5,
+        'kernels': [32, 32],#, 32],
+        'kernel_act': ['relu', 'relu'],#, 'relu'],
+        'hiddens': [16, 8],
+        'act_fun': ['relu', 'relu'],
+        #'learning_rate': 0.000005,
+        'learning_rate': 0.001,
+        'batch_size': 32,
+        'rng_seed': None,
+        'rng_seed_list': [123, ],
+        'n_epochs': 30,
+        'patience': 10,
+        'loss': 'mse',
+        'random_seed': 10,
+}
