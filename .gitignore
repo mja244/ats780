@@ -8,3 +8,7 @@ HW1/plots
 *.doc
 *.dot
 HW2/data
+*.keras
+*.pkl
+HW2/small_cnn_model
+*.pdf
