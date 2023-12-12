@@ -12,3 +12,4 @@ HW2/data
 *.pkl
 HW2/small_cnn_model
 *.pdf
+*.nc

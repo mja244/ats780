@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import pickle
 from scipy.signal import detrend
 from settings import settings
+from functions import get_gradients, get_integrated_gradients
 
 # Load data (previously processed on German supercomputer Levante)
 # 'predictand' is the precipitation output predicted by the MPI GE
@@ -83,111 +84,112 @@ np.save('data/Yval_pr', Yval)
 
 
 
-##----------------Build the model---------------------------------
-#
-#def build_model(Xtrain, Ytrain, settings):
-#	# create input layer
-#	input_layer = tf.keras.layers.Input(shape=Xtrain.shape[1:])
-#
-#	## create normalization layer
-#	#normalizer = tf.keras.layers.Normalization(axis=(1,))
-#	#normalizer.adapt(Xtrain)
-#	#layers = normalizer(input_layer)
-#
-#	# use this if you don't normalize
-#	layers = tf.keras.layers.Layer()(input_layer)
-#
-#	# convolutional layers (repeat 3 times: conv, conv, pooling)
-#	for k_size, activation in zip(settings['kernels'], settings['kernel_act']):
-#		layers = tf.keras.layers.Conv2D(
-#			filters=1, 
-#			kernel_size=k_size, 
-#			strides=2,
-#			activation=activation, 
-#			padding='same',
-#			#input_shape=[96, 192, 1],
-#		)(layers)
-#
-#		#layers = tf.keras.layers.Conv2D(
-#		#	filters=1, 
-#		#	kernel_size=k_size, 
-#		#	strides=1,
-#		#	activation=activation, 
-#		#	padding='same',
-#		#	input_shape=[96, 192, 1],
-#		#)(layers)
-#
-#		# pooling layer (not necessary?)
-#		layers = tf.keras.layers.MaxPool2D(pool_size=2, padding='same')(layers)
-#
-#	conv_shape = layers.shape
-#
-#	# dense layers (3 layers including output layer of 1)
-#	layers = tf.keras.layers.Flatten()(layers)
-#	for hidden, activation in zip(settings['hiddens'], settings['act_fun']):
-#		layers = tf.keras.layers.Dense(
-#			units=hidden,
-#			activation=activation,
-#			kernel_regularizer=tf.keras.regularizers.l1_l2(l1=0, l2=0),
-#			bias_initializer=tf.keras.initializers.RandomNormal(seed=settings['random_seed']),
-#			kernel_initializer=tf.keras.initializers.RandomNormal(seed=settings['random_seed']),
-#		)(layers)
-#
-#	# output layer
-#	output_layer = tf.keras.layers.Dense(
-#		units=1,
-#		bias_initializer=tf.keras.initializers.RandomNormal(seed=settings['random_seed'] + 1),
-#		kernel_initializer=tf.keras.initializers.RandomNormal(seed=settings['random_seed'] + 2),
-#		)(layers)
-#
-#	# construct model
-#	model = tf.keras.Model(inputs=input_layer, outputs=output_layer)
-#	model.summary()
-#
-#	return model
-#
-##------------------------Compile model----------------------------
-#
-#def compile_model(model, settings):
-#	model.compile(
-#		optimizer=tf.keras.optimizers.Adam(learning_rate=settings['learning_rate']),
-#		loss=settings['loss'],
-#		metrics=settings['loss'],
-#			#tf.keras.metrics.MSE(),
-#		#],
-#	)
-#	return model
-#
-#
-#
-##---------------------------Settings------------------------------
-#
-#tf.keras.backend.clear_session()
-#tf.keras.utils.set_random_seed(settings['random_seed'])
-#
-#model = build_model(Xtrain, Ytrain, settings)
-#model = compile_model(model, settings)
-#
-#model.save('small_cnn_model', save_format='tf')
+#----------------Build the model---------------------------------
 
-print('hi')
-model = tf.keras.models.load_model('small_cnn_model.keras')
+def build_model(Xtrain, Ytrain, settings):
+	# create input layer
+	input_layer = tf.keras.layers.Input(shape=Xtrain.shape[1:])
 
-loss, acc = model.evaluate(Xval, Yval, verbose=2)
-print('Restored model, accuracy: {:5.2f}%'.format(100 * acc))
+	## create normalization layer
+	#normalizer = tf.keras.layers.Normalization(axis=(1,))
+	#normalizer.adapt(Xtrain)
+	#layers = normalizer(input_layer)
+
+	# use this if you don't normalize
+	layers = tf.keras.layers.Layer()(input_layer)
+
+	# convolutional layers (repeat 3 times: conv, conv, pooling)
+	for k_size, activation in zip(settings['kernels'], settings['kernel_act']):
+		layers = tf.keras.layers.Conv2D(
+			filters=1, 
+			kernel_size=k_size, 
+			strides=2,
+			activation=activation, 
+			padding='same',
+			#input_shape=[96, 192, 1],
+		)(layers)
+
+		#layers = tf.keras.layers.Conv2D(
+		#	filters=1, 
+		#	kernel_size=k_size, 
+		#	strides=1,
+		#	activation=activation, 
+		#	padding='same',
+		#	input_shape=[96, 192, 1],
+		#)(layers)
+
+		# pooling layer (not necessary?)
+		layers = tf.keras.layers.MaxPool2D(pool_size=2, padding='same')(layers)
+
+	conv_shape = layers.shape
+
+	# dense layers (3 layers including output layer of 1)
+	layers = tf.keras.layers.Flatten()(layers)
+	for hidden, activation in zip(settings['hiddens'], settings['act_fun']):
+		layers = tf.keras.layers.Dense(
+			units=hidden,
+			activation=activation,
+			kernel_regularizer=tf.keras.regularizers.l1_l2(l1=0, l2=0),
+			bias_initializer=tf.keras.initializers.RandomNormal(seed=settings['random_seed']),
+			kernel_initializer=tf.keras.initializers.RandomNormal(seed=settings['random_seed']),
+		)(layers)
+
+	# output layer
+	output_layer = tf.keras.layers.Dense(
+		units=1,
+		bias_initializer=tf.keras.initializers.RandomNormal(seed=settings['random_seed'] + 1),
+		kernel_initializer=tf.keras.initializers.RandomNormal(seed=settings['random_seed'] + 2),
+		)(layers)
+
+	# construct model
+	model = tf.keras.Model(inputs=input_layer, outputs=output_layer)
+	model.summary()
+
+	return model
+
+#------------------------Compile model----------------------------
+
+def compile_model(model, settings):
+	model.compile(
+		optimizer=tf.keras.optimizers.Adam(learning_rate=settings['learning_rate']),
+		loss=settings['loss'],
+		metrics=settings['loss'],
+			#tf.keras.metrics.MSE(),
+		#],
+	)
+	return model
 
 
-##----------------------Train the model!----------------------------
+
+#---------------------------Settings------------------------------
+
+tf.keras.backend.clear_session()
+tf.keras.utils.set_random_seed(settings['random_seed'])
+
+model = build_model(Xtrain, Ytrain, settings)
+model = compile_model(model, settings)
+
+
+#print('hi')
+#model = tf.keras.models.load_model('small_cnn_model.keras')
 #
-#history = model.fit(
-#	Xtrain,
-#	Ytrain,
-#	epochs=settings['n_epochs'],
-#	batch_size=settings['batch_size'],
-#	shuffle=True,
-#	validation_data=[Xval, Yval],	
-#	verbose=1,
-#	)
+#loss, acc = model.evaluate(Xval, Yval, verbose=2)
+#print('Restored model, accuracy: {:5.2f}%'.format(100 * acc))
+
+
+#----------------------Train the model!----------------------------
+
+history = model.fit(
+	Xtrain,
+	Ytrain,
+	epochs=settings['n_epochs'],
+	batch_size=settings['batch_size'],
+	shuffle=True,
+	validation_data=[Xval, Yval],	
+	verbose=1,
+	)
+
+model.save('small_cnn_model_precip.keras')
 
 #with open('training_history_small.pkl', 'wb') as file:
 #	pickle.dump(history.history, file)
@@ -204,42 +206,45 @@ print('Restored model, accuracy: {:5.2f}%'.format(100 * acc))
 #plt.show()
 
 
-#------------plot predictions--------------------------
-errTrain = model.predict(Xtrain)
-errVal = model.predict(Xval)
+##------------plot predictions--------------------------
+#errTrain = model.predict(Xtrain)
+#errVal = model.predict(Xval)
+##errTest = model.predict(Xtest)
+##
+##np.save('data/errTrain', errTrain)
+##np.save('data/errVal', errVal)
+##np.save('data/errTest', errTest)
+##
+##errTrain = np.load('data/errTrain.npy')
+##errVal = np.load('data/errVal.npy')
+#
+#fig, ax = plt.subplots()
+#
+#ax.plot(np.arange(0, 150), errVal[0:150])
+#ax.plot(np.arange(0, 150), Yval[0:150])
+#
+#ax.set_xlabel('Year')
+#ax.set_ylabel('SUWS precip (mm/day normalized)')
+#
+#plt.show()
+#plt.close()
+#
+#
+##-------------plot truth vs what model predicts------------
 #errTest = model.predict(Xtest)
 #
-#np.save('data/errTrain', errTrain)
-#np.save('data/errVal', errVal)
-#np.save('data/errTest', errTest)
+#fig, ax = plt.subplots()
 #
-#errTrain = np.load('data/errTrain.npy')
-#errVal = np.load('data/errVal.npy')
+#ax.scatter(errTest, Ytest)
+#
+#ax.set_xlabel('CNN prediction')
+#ax.set_ylabel('AOGCM (actual)')
+#
+#ax.set_xlim((-2.5, 2.5))
+#ax.set_ylim((-2.5, 2.5))
+#
+#plt.show()
+#plt.close()
 
-fig, ax = plt.subplots()
-
-ax.plot(np.arange(0, 150), errVal[0:150])
-ax.plot(np.arange(0, 150), Yval[0:150])
-
-ax.set_xlabel('Year')
-ax.set_ylabel('SUWS precip (mm/day normalized)')
-
-plt.show()
-plt.close()
-
-
-#-------------plot truth vs what model predicts------------
-errTest = model.predict(Xtest)
-
-fig, ax = plt.subplots()
-
-ax.scatter(errTest, Ytest)
-
-ax.set_xlabel('CNN prediction')
-ax.set_ylabel('AOGCM (actual)')
-
-ax.set_xlim((-2.5, 2.5))
-ax.set_ylim((-2.5, 2.5))
-
-plt.show()
-plt.close()
+hi = get_gradients(Xtrain, model)
+np.save('Xtrain_xai_new', hi)

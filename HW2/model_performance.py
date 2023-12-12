@@ -17,7 +17,7 @@ tf.keras.utils.set_random_seed(settings['random_seed'])
 with open('training_history_small.pkl', 'rb') as file:
 	history = pickle.load(file)
 
-model = tf.keras.models.load_model('small_cnn_model')
+model = tf.keras.models.load_model('small_cnn_model_precip.keras')
 
 Xtrain = np.load('data/Xtrain_pr.npy')
 Xval = np.load('data/Xval_pr.npy')
@@ -55,7 +55,7 @@ errVal = model.predict(Xval)
 
 fig, ax = plt.subplots()
 
-ax.plot(np.arange(0, 50), errTrain[0:50])
-ax.plot(np.arange(0, 50), Ytrain[0:50])
+ax.plot(np.arange(0, 50), errVal[0:50])
+ax.plot(np.arange(0, 50), Yval[0:50])
 
 plt.show()

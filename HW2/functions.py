@@ -1,41 +1,7 @@
-# Apply integrated gradients XAI
-# technique to precip CNN model
-
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
-from matplotlib.cm import get_cmap
-import cartopy.crs as ccrs
-from cartopy.feature import NaturalEarthFeature
-import cartopy.feature as cfeature
-from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-import xarray as xr
 
-#####
-## Load model
-#####
-
-model = tf.keras.models.load_model('../HW2/small_cnn_model_precip.keras')
-
-#####
-## Load data
-#####
-# SST
-Xtrain = np.load('../HW2/data/Xtrain_pr.npy')
-Xval = np.load('../HW2/data/Xval_pr.npy')
-#Xtest = np.load('data/Xtest_pr.npy')
-
-# precip
-Ytrain = np.load('../HW2/data/Ytrain_pr.npy')
-Yval = np.load('../HW2/data/Yval_pr.npy')
-#Ytest = np.load('data/Ytest_pr.npy')
-
-# base
-DS_base = xr.open_dataset('BOT_test_calculation_1007.nc')
-lats = DS_base.lat.values
-lons = DS_base.lon.values
-
-def get_gradients(inputs, top_pred_idx=None):
+def get_gradients(inputs, model, top_pred_idx=None):
     """Computes the gradients of outputs w.r.t input image.
 
     Args:
@@ -51,20 +17,19 @@ def get_gradients(inputs, top_pred_idx=None):
 
     with tf.GradientTape() as tape:
         tape.watch(inputs)
-        
+
         # Run the forward pass of the layer and record operations
         # on GradientTape.
-        preds = model(inputs, training=False)  
-        
+        preds = model(inputs, training=False)
+
         # For classification, grab the top class
         if top_pred_idx is not None:
             preds = preds[:, top_pred_idx]
-        
+
     # Use the gradient tape to automatically retrieve
-    # the gradients of the trainable variables with respect to the loss.        
+    # the gradients of the trainable variables with respect to the loss.
     grads = tape.gradient(preds, inputs)
     return grads
-
 
 def get_integrated_gradients(inputs, baseline=None, num_steps=50, top_pred_idx=None):
     """Computes Integrated Gradients for a prediction.
@@ -78,7 +43,7 @@ def get_integrated_gradients(inputs, baseline=None, num_steps=50, top_pred_idx=N
             num_steps is set to 50.
         top_pred_idx: (optional) Predicted label for the x_data
                       if classification problem. If regression,
-                      do not include.            
+                      do not include.
 
     Returns:
         Integrated gradients w.r.t input image
@@ -114,45 +79,11 @@ def get_integrated_gradients(inputs, baseline=None, num_steps=50, top_pred_idx=N
     integrated_grads = (inputs - baseline) * avg_grads
     return integrated_grads
 
-Xtrain_small = Xtrain[100,:,:,:]
-
-hi = get_gradients(Xtrain_small[np.newaxis,:,:,:])
-np.save('Xtrain_xai_one', hi)
-#print(hi.shape)
+#model = tf.keras.models.load_model('small_cnn_model')
+#Xtrain = np.load('data/Xtrain_pr.npy')
 #
-#print('1')
-#ax = plt.axes(projection=ccrs.Robinson(central_longitude=180))
+#Xtrain_test = Xtrain[100,:,:,:]
+#np.save('data/Xtrain_pr_test', Xtrain_test)
 #
-#contours = np.arange(268, 305, 4)
-#
-#cb = plt.contourf(lons, lats, hi[100,:,:,0], #contours,
-#    transform=ccrs.PlateCarree(), cmap=get_cmap('inferno'))
-#print('2')
-#
-#ax.coastlines()
-#
-#gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=False,
-#    linewidth=1, color='dimgray', alpha=0.5, linestyle='--')
-#
-#print('3')
-#gl.xlabels_top = False
-#gl.ylabels_right = False
-#gl.xlabels_bottom = False
-#gl.ylabels_left = False
-##gl.xformatter = LONGITUDE_FORMATTER
-##gl.yformatter = LATITUDE_FORMATTER
-#gl.xlocator = mticker.FixedLocator([0, 90, 180, -90, 0])
-#gl.ylocator = mticker.FixedLocator([-90, -60, -30, 0, 30, 60, 90])
-##gl.xlabel_style = {'size': 10, 'color': 'gray'}
-##gl.ylabel_style = {'size': 10, 'color': 'gray'}
-#
-#plt.subplots_adjust(bottom = 0.1,hspace=0.3,wspace=0.0)
-#print('4')
-#
-#cbar = plt.colorbar(cb, orientation="horizontal")
-#cbar.set_label(r'Precip GF sensitivity',fontsize=12)
-#
-#print('5')
-##plt.show()
-#plt.savefig('one_year_test.png', dpi=300)
-##plt.close()
+#hi = get_gradients(Xtrain_test[np.newaxis,:,:,:], model)
+#np.save('data/Xtrain_xai_test', hi)
